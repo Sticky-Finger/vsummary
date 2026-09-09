@@ -54,3 +54,6 @@ config/settings.toml
 .env
 .env.*
 !.env.example
+
+# Pi coding agent session artifacts
+.pi/
