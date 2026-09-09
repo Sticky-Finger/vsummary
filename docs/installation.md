@@ -76,6 +76,85 @@ model = "large-v3-turbo-q5_0"
 embedding_device = "cpu"
 ```
 
+## Linux(Ubuntu 22.04+ / Debian 12+ / Arch)
+
+> 仅交付源码版运行;Linux Pack 打包脚本待后续支持。AMD 显卡路径不在本文档范围,如需 AMD Vulkan whisper.cpp 可参考 macOS 章节的 `whisper.cpp` 编译步骤,工具链一致。
+
+```bash
+# 系统依赖
+sudo apt install -y ffmpeg libsm6 libxrender1 libxext6
+# 可选:启用「本机文件选择」对话框
+# sudo apt install -y python3-tk
+
+git clone <repo-url> vsummary
+cd vsummary
+conda env create -f environment.cpu.yml
+conda activate vsummary
+( cd src/frontend && npm install )
+cd ../..
+chmod +x start.sh
+./start.sh
+```
+
+`start.sh` 自动找到 `vsummary` 环境的 Python,分别在后台启动后端(8001)与前端(4173),并用 `xdg-open` 打开浏览器;`xdg-open` 不可用时回退到 `$BROWSER`,都没有则只打印 URL。端口占用探测不依赖 `lsof`,改用 Python 短连接。
+
+### 仅 CPU 转写(默认)
+
+```toml
+[asr]
+provider = "faster_whisper"
+
+[asr.faster_whisper]
+device = "cpu"
+compute_type = "int8"
+
+[agent_retrieval]
+embedding_device = "cpu"
+```
+
+### NVIDIA GPU 转写(可选)
+
+要求:系统已装 NVIDIA 驱动(`nvidia-smi` 可用,推荐 driver ≥ 535);x86_64。`environment.yml` 已经通过 pip 安装 `nvidia-cu12` 跨平台 wheel,只要系统 CUDA 12 runtime 可见即可。
+
+```bash
+conda env create -f environment.yml
+conda activate vsummary
+( cd src/frontend && npm install )
+./start.sh
+```
+
+配置:
+
+```toml
+[asr]
+provider = "faster_whisper"
+
+[asr.faster_whisper]
+device = "gpu"
+compute_type = "float16"
+
+[agent_retrieval]
+embedding_device = "gpu"
+```
+
+验证:`nvidia-smi` 应能列出 GPU;设置页「本机能力」应显示 NVIDIA / CUDA 可用。
+
+### 不想配置本地 ASR
+
+跟 Windows 一样,推荐使用阿里云百炼的云端 ASR。`.env` 与 `config/settings.toml` 的写法完全相同,见本文档下文「不想配置本地 ASR」章节。
+
+### B 站扫码登录
+
+Linux 上 DrissionPage 需要 Chrome/Chromium 二进制。安装以下任一即可:
+
+```bash
+sudo apt install -y chromium-browser   # Debian/Ubuntu
+# 或 sudo apt install -y google-chrome-stable
+# Arch: sudo pacman -S chromium
+```
+
+应用启动扫码时会自动从 PATH 探测 `google-chrome` / `chromium` / `chromium-browser` / `microsoft-edge` / `chrome` 中第一个存在的。
+
 ## macOS / Apple Silicon
 
 ```bash

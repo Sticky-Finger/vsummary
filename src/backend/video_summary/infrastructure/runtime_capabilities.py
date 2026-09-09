@@ -66,6 +66,8 @@ def _detect_accelerator(system_name: str, nvidia_cuda_available: bool) -> str:
 
 
 def _has_amd_display_adapter() -> bool:
+    if platform.system().lower() != "windows":
+        return False
     try:
         completed = subprocess.run(
             [

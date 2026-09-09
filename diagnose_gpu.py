@@ -131,6 +131,10 @@ def main() -> int:
     reporter = Reporter()
     dll_handles: list[object] = []
 
+    if sys.platform != "win32":
+        print("diagnose_gpu.py 当前仅服务于 Windows 整合包自检;Linux 源码版请直接运行 start.sh。")
+        return 0
+
     reporter.line("VSummary GPU runtime diagnosis")
     reporter.line(f"package_root: {root}")
     reporter.line(f"python: {sys.executable}")

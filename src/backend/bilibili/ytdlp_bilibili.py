@@ -11,6 +11,7 @@ import asyncio
 from collections import deque
 import os
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -427,16 +428,23 @@ def _create_drission_page(user_data_dir: str, browser_port: int) -> object:
 
 def _resolve_default_browser_path(*, exists: Callable[[Path], bool] | None = None) -> str | None:
     path_exists = exists or Path.exists
-    program_files = [os.environ.get("PROGRAMFILES"), os.environ.get("PROGRAMFILES(X86)")]
-    browser_candidates = [
-        ("Google", "Chrome", "Application", "chrome.exe"),
-        ("Microsoft", "Edge", "Application", "msedge.exe"),
-    ]
-    for parts in browser_candidates:
-        for base_dir in [path for path in program_files if path]:
-            candidate = Path(base_dir).joinpath(*parts)
-            if path_exists(candidate):
-                return str(candidate)
+    if os.name == "nt":
+        program_files = [os.environ.get("PROGRAMFILES"), os.environ.get("PROGRAMFILES(X86)")]
+        browser_candidates = [
+            ("Google", "Chrome", "Application", "chrome.exe"),
+            ("Microsoft", "Edge", "Application", "msedge.exe"),
+        ]
+        for parts in browser_candidates:
+            for base_dir in [path for path in program_files if path]:
+                candidate = Path(base_dir).joinpath(*parts)
+                if path_exists(candidate):
+                    return str(candidate)
+        return None
+    # POSIX:优先 PATH 中的可执行名,DrissionPage 也能不指定二进制走系统默认。
+    for name in ("google-chrome", "chromium", "chromium-browser", "microsoft-edge", "chrome"):
+        resolved = shutil.which(name)
+        if resolved:
+            return resolved
     return None
 
 

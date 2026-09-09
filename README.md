@@ -76,7 +76,7 @@ AI 助手可以先检索 Bilibili 内容，再将选中的视频交给 VSummary 
 
 ## 快速开始
 
-- [安装、硬件与 ASR 配置](docs/installation.md)：Windows NVIDIA、Windows AMD、macOS 的环境、模型与启动方式。
+- [安装、硬件与 ASR 配置](docs/installation.md)：Windows NVIDIA、Windows AMD、Linux、macOS 的环境、模型与启动方式。
 
 ## 数据目录
 

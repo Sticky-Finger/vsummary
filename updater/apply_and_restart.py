@@ -58,14 +58,30 @@ def _is_process_running(pid: int) -> bool:
 
 
 def _restart_pack(root: Path) -> None:
-    start_script = root / "start.bat"
+    if os.name == "nt":
+        start_script = root / "start.bat"
+        if not start_script.is_file():
+            raise RuntimeError(f"Pack start script not found: {start_script}")
+        subprocess.Popen(
+            ["cmd.exe", "/c", "start", "", str(start_script)],
+            cwd=root,
+            close_fds=True,
+            creationflags=_background_process_flags(),
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        return
+
+    # POSIX:用 start.sh 启动,并脱离当前会话避免关闭 shell 时被打断。
+    start_script = root / "start.sh"
     if not start_script.is_file():
         raise RuntimeError(f"Pack start script not found: {start_script}")
     subprocess.Popen(
-        ["cmd.exe", "/c", "start", "", str(start_script)],
+        ["/bin/bash", str(start_script)],
         cwd=root,
         close_fds=True,
-        creationflags=_background_process_flags(),
+        start_new_session=True,
         stdin=subprocess.DEVNULL,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,

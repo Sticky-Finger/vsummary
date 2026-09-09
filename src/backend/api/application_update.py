@@ -95,13 +95,14 @@ def schedule_update(*, root: Path, variant: str, container: object) -> int:
 
 
 def _is_pack_installation(root: Path) -> bool:
+    python_rel = "python.exe" if os.name == "nt" else "bin/python"
     return all(
         path.is_file()
         for path in (
             root / "VERSION",
             root / "updater" / "installed.json",
             root / "updater" / "config.json",
-            root / "runtime" / "python.exe",
+            root / "runtime" / python_rel,
         )
     )
 
