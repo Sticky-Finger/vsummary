@@ -117,6 +117,7 @@ class WorkspaceServices:
     invalidate_agent_graph_service: Callable[[], None]
     invalidate_agent_workspace_indexes: Callable[[], None]
     refresh_agent_workspace_indexes: Callable[[], None]
+    inspect_agent_workspace_indexes: Callable[..., dict[str, object]]
     debug_mode: bool
     embedding_provider: str = "fastembed"
     after_summary: Callable[[str,str], Awaitable[list[str]]] | None = None

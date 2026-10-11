@@ -77,6 +77,7 @@ def make_workspace_services(*, workspace_id="workspace-1", **overrides) -> scope
         invalidate_agent_graph_service=create_autospec(lambda: None),
         invalidate_agent_workspace_indexes=create_autospec(lambda: None),
         refresh_agent_workspace_indexes=create_autospec(lambda: None),
+        inspect_agent_workspace_indexes=create_autospec(lambda *args, **kwargs: {}),
         debug_mode=False,
     )
     return replace(services, **overrides)

@@ -288,8 +288,23 @@ async function loadAgentContextUsage(sessionId, context) {
   );
 }
 
-async function loadAgentMemoryStatus() {
-  return toProgressSnapshot(await fetchJson("/api/workspace/index/status"));
+async function loadAgentMemoryStatus(seriesId = null) {
+  const query = seriesId ? `?${new URLSearchParams({ series_id: seriesId })}` : "";
+  const payload = await fetchJson(`/api/workspace/index/status${query}`);
+  if (typeof payload.index_state !== "string" || !payload.video_states) {
+    throw new Error("后端未返回索引健康状态，请重启更新后的后端。");
+  }
+  const snapshot = toProgressSnapshot(payload);
+  return {
+    ...snapshot,
+    status: ["queued", "retrying", "cancelling"].includes(payload.status) ? "running" : snapshot.status,
+    indexState: payload.index_state,
+    indexError: payload.index_error,
+    videoStates: payload.video_states,
+    seriesId: payload.series_id,
+    requestedRevision: payload.requested_revision,
+    completedRevision: payload.completed_revision,
+  };
 }
 
 async function loadAgentSessionRecovery(sessionId, context) {

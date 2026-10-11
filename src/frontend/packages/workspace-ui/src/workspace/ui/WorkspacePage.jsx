@@ -1,6 +1,6 @@
 import {useWorkspaceRuntime} from "../../runtime/WorkspaceProvider";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
-import { Captions, CheckCircle2, Database, LoaderCircle, X } from "lucide-react";
+import { Captions, CheckCircle2, Database, LoaderCircle, RefreshCw, X } from "lucide-react";
 import { WorkspaceLibraryPanel } from "./WorkspaceLibraryPanel";
 import { WorkspaceVideoScopePane } from "./WorkspaceVideoScopePane";
 import { WorkspaceSeriesGrid } from "./WorkspaceSeriesGrid";
@@ -444,6 +444,7 @@ export function WorkspacePage({ page, panels = {}, toolbarExtras = null, toolbar
           {activeSeries ? (
             <WorkspaceLibraryPanel
               activeSeries={activeSeries}
+              indexSnapshot={state.knowledgeMemorySnapshot}
               selectedContextType={selectedContextType}
               selectedVideo={selectedVideo}
               isGeneratingSelectedVideo={generation.isGeneratingSummary}
@@ -766,33 +767,38 @@ export function WorkspacePage({ page, panels = {}, toolbarExtras = null, toolbar
 }
 
 function WorkspaceKnowledgeMemoryStatusBar({ snapshot }) {
+  const { api } = useWorkspaceRuntime();
   const [dismissedSnapshotKey, setDismissedSnapshotKey] = useState(null);
-  if (!snapshot || snapshot.status === "idle" || snapshot.status === "completed") {
+  const [rebuildPending, setRebuildPending] = useState(false);
+  const [rebuildError, setRebuildError] = useState(null);
+  useEffect(() => {
+    if (snapshot?.status === "running" || snapshot?.indexState === "ready") setRebuildPending(false);
+  }, [snapshot]);
+  if (!snapshot || (snapshot.indexState === "ready" && snapshot.status !== "running")) {
     return null;
   }
-  const snapshotKey = `${snapshot.status}:${snapshot.sequence ?? 0}:${snapshot.updatedAt ?? 0}`;
+  const snapshotKey = `${snapshot.indexState}:${snapshot.status}:${snapshot.requestedRevision}:${snapshot.sequence ?? 0}`;
   if (dismissedSnapshotKey === snapshotKey) {
     return null;
   }
-  if (
-    snapshot.status === "completed" &&
-    typeof snapshot.updatedAt === "number" &&
-    Date.now() / 1000 - snapshot.updatedAt > 10
-  ) {
-    return null;
-  }
-  if (snapshot.status !== "running" && snapshot.status !== "completed" && snapshot.status !== "failed") {
-    return null;
-  }
-
   const isRunning = snapshot.status === "running";
   const isFailed = snapshot.status === "failed";
   const Icon = isRunning ? LoaderCircle : isFailed ? Database : CheckCircle2;
-  const title = isRunning ? "数据库整理中" : isFailed ? "数据库整理失败" : "数据库已整理";
-  const detail = isFailed
-    ? snapshot.error ?? "服务发生异常，请稍后重试。"
-    : snapshot.detail ?? (isRunning ? "正在构建视频关联知识库，完成后即可开始提问。" : "知识库已准备就绪，可用于问答检索。");
-  const progressText = typeof snapshot.progress === "number" ? `${Math.round(snapshot.progress)}%` : "";
+  const titles = { missing: "检索索引缺失", stale: "检索索引已过期", failed: "检索索引不可用", unknown: "检索索引状态未知" };
+  const title = isRunning ? "正在更新检索索引" : titles[snapshot.indexState] ?? "检索索引构建失败";
+  const detail = rebuildError ?? snapshot.indexError ?? (isFailed ? snapshot.error : null)
+    ?? (isRunning ? snapshot.detail : "部分内容尚未进入最新索引，请重建检索索引。");
+  const progressText = isRunning && typeof snapshot.progress === "number" ? `${Math.round(snapshot.progress)}%` : "";
+  const rebuildIndex = async () => {
+    setRebuildPending(true);
+    setRebuildError(null);
+    try {
+      await api.fetchJson("/api/workspace/index/refresh", { method: "POST" });
+    } catch (error) {
+      setRebuildPending(false);
+      setRebuildError(error instanceof Error ? error.message : "提交重建任务失败");
+    }
+  };
   const toneClassName = isFailed
     ? "border-danger bg-danger-subtle text-danger"
     : "border-warning bg-warning-subtle text-warning";
@@ -807,8 +813,15 @@ function WorkspaceKnowledgeMemoryStatusBar({ snapshot }) {
           <span>{title}</span>
           {progressText ? <span className="text-xs opacity-70">{progressText}</span> : null}
         </div>
-        <p className="mt-0.5 truncate text-xs opacity-80">{detail}</p>
+        <p className="mt-0.5 break-words text-xs opacity-80">{detail}</p>
       </div>
+      {!isRunning && snapshot.indexState !== "unknown" ? (
+        <button type="button" onClick={rebuildIndex} disabled={rebuildPending}
+          title="重建检索索引" aria-label="重建检索索引"
+          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg hover:bg-white/60 disabled:opacity-50">
+          <RefreshCw size={16} className={rebuildPending ? "animate-spin" : ""} />
+        </button>
+      ) : null}
       <button
         type="button"
         onClick={() => setDismissedSnapshotKey(snapshotKey)}

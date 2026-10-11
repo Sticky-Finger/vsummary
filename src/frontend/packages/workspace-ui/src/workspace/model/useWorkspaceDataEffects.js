@@ -174,7 +174,7 @@ function useWorkspaceDataEffects(state, dispatch) {
 
     const pollMemoryStatus = async () => {
       try {
-        const snapshot = await loadAgentMemoryStatus();
+        const snapshot = await loadAgentMemoryStatus(state.selectedSeriesId);
         if (cancelled) {
           return;
         }
@@ -183,8 +183,12 @@ function useWorkspaceDataEffects(state, dispatch) {
           pollMemoryStatus,
           snapshot.status === "running" ? 1000 : 5000,
         );
-      } catch {
+      } catch (error) {
         if (!cancelled) {
+          dispatch({ type: "knowledge_memory_status_loaded", snapshot: {
+            status: "failed", indexState: "unknown", videoStates: {},
+            error: error instanceof Error ? error.message : "无法检查检索索引状态，请确认服务连接。",
+          } });
           timeoutId = window.setTimeout(pollMemoryStatus, 5000);
         }
       }
@@ -198,7 +202,7 @@ function useWorkspaceDataEffects(state, dispatch) {
         window.clearTimeout(timeoutId);
       }
     };
-  }, [dispatch, state.backendReady]);
+  }, [dispatch, state.backendReady, state.selectedSeriesId]);
 
 
 

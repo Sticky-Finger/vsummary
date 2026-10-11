@@ -79,6 +79,7 @@ class IndexRefreshPlan:
     revision: int
     generation: str | None
     changes: tuple[dict[str, Any], ...]
+    completed_revision: int
 
 
 class SqlJobRepository:
@@ -271,7 +272,8 @@ class SqlJobRepository:
             if workspace is None:
                 raise LookupError("workspace not found")
             return IndexRefreshPlan(workspace.index_revision_requested, workspace.index_generation,
-                tuple(dict(change) for change in workspace.index_pending_changes.values()))
+                tuple(dict(change) for change in workspace.index_pending_changes.values()),
+                workspace.index_revision_completed)
 
     def complete_index_refresh(self, claim: ClaimedJob, revision: int, generation: str) -> None:
         with self._session_factory.begin() as session:

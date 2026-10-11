@@ -10,14 +10,6 @@ from backend.video_summary.library.usecases.mutations import (
 )
 
 
-class _IndexRefresher:
-    def delete_series(self, _series_id: str) -> None:
-        raise AssertionError("Index must not mutate after a Job conflict.")
-
-    def delete_video(self, _series_id: str, _video_id: str) -> None:
-        raise AssertionError("Index must not mutate after a Job conflict.")
-
-
 class _ConflictWorkspace:
     def list_series(self):
         return []
@@ -35,8 +27,8 @@ class _ConflictWorkspace:
 class DurableJobDeletionConflictTests(unittest.TestCase):
     def test_series_delete_maps_durable_job_conflict(self) -> None:
         with self.assertRaisesRegex(GenerationInProgressError, "active job"):
-            DeleteSeries(_ConflictWorkspace(), _IndexRefresher()).run("series-1")
+            DeleteSeries(_ConflictWorkspace()).run("series-1")
 
     def test_video_delete_maps_durable_job_conflict(self) -> None:
         with self.assertRaisesRegex(GenerationInProgressError, "active job"):
-            DeleteVideoSource(_ConflictWorkspace(), _IndexRefresher()).run("series-1", "video-1")
+            DeleteVideoSource(_ConflictWorkspace()).run("series-1", "video-1")

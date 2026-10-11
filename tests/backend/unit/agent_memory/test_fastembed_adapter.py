@@ -8,9 +8,19 @@ from unittest.mock import patch
 
 from backend.video_summary.infrastructure.rag.agent_memory import fastembed_adapter
 from backend.video_summary.infrastructure.rag.agent_memory.fastembed_adapter import FastEmbedEmbedding
+from backend.core.errors import UserVisibleError
 
 
 class FastEmbedEmbeddingTests(unittest.TestCase):
+    def test_missing_cuda_is_user_visible_before_model_loading(self) -> None:
+        with patch("onnxruntime.get_available_providers", return_value=["CPUExecutionProvider"]), patch.object(
+            fastembed_adapter, "_load_text_embedding_cls"
+        ) as load:
+            with self.assertRaises(UserVisibleError) as caught:
+                FastEmbedEmbedding(model_name="model", device="gpu")
+        self.assertEqual(caught.exception.code, "rag_cuda_unavailable")
+        load.assert_not_called()
+
     def test_uses_fastembed_for_text_and_query_embeddings(self) -> None:
         with patch(
             "backend.video_summary.infrastructure.rag.agent_memory.fastembed_adapter._load_text_embedding_cls",
@@ -31,6 +41,7 @@ class FastEmbedEmbeddingTests(unittest.TestCase):
         _FakeTextEmbedding.created = []
         _FakeTextEmbedding.active_providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
         with (
+            patch("onnxruntime.get_available_providers", return_value=["CUDAExecutionProvider", "CPUExecutionProvider"]),
             patch(
                 "backend.video_summary.infrastructure.rag.agent_memory.fastembed_adapter._load_text_embedding_cls",
                 return_value=_FakeTextEmbedding,
@@ -47,6 +58,7 @@ class FastEmbedEmbeddingTests(unittest.TestCase):
         _FakeTextEmbedding.created = []
         _FakeTextEmbedding.active_providers = ["CPUExecutionProvider"]
         with (
+            patch("onnxruntime.get_available_providers", return_value=["CUDAExecutionProvider", "CPUExecutionProvider"]),
             patch(
                 "backend.video_summary.infrastructure.rag.agent_memory.fastembed_adapter._load_text_embedding_cls",
                 return_value=_FakeTextEmbedding,

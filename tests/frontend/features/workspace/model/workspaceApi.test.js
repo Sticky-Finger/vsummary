@@ -5,10 +5,28 @@ const transport = { fetch: vi.fn(), subscribe: vi.fn(), CLOSED: 2 };
 const { generateVideoSummary, processAgentVideo, cancelDurableJob,
   loadVideoGenerationStatus,
   generateSeriesSummaries, subscribeSeriesGenerationProgress, subscribeVideoGenerationProgress,
-  loadAgentSessionRecovery, subscribeDurableJobProgress, loadProviderUsage } = createWorkspaceApi(transport);
+  loadAgentSessionRecovery, loadAgentMemoryStatus, subscribeDurableJobProgress, loadProviderUsage } = createWorkspaceApi(transport);
 
 afterEach(() => {
   vi.resetAllMocks();
+});
+
+describe("index health", () => {
+  test("preserves missing video coverage independently of a successful job", async () => {
+    transport.fetch.mockResolvedValue({ ok: true, json: async () => ({
+      status: "succeeded", index_state: "stale", series_id: "series-1",
+      video_states: { a: "ready", b: "missing" }, requested_revision: 4, completed_revision: 4,
+    }) });
+    await expect(loadAgentMemoryStatus("series-1")).resolves.toMatchObject({
+      status: "completed", indexState: "stale", videoStates: { a: "ready", b: "missing" },
+    });
+    expect(transport.fetch.mock.calls[0][0]).toBe("/api/workspace/index/status?series_id=series-1");
+  });
+
+  test("rejects a job-only response instead of claiming an index is ready", async () => {
+    transport.fetch.mockResolvedValue({ ok: true, json: async () => ({ status: "succeeded" }) });
+    await expect(loadAgentMemoryStatus()).rejects.toThrow("索引健康状态");
+  });
 });
 
 describe("series generation submission and progress", () => {

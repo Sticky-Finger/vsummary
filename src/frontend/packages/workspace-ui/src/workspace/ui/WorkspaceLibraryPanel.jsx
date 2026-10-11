@@ -4,6 +4,7 @@ import {
   ArrowDown,
   Search,
   LoaderCircle,
+  RefreshCw,
   Sparkles,
   FileVideo,
   CheckCircle2,
@@ -132,6 +133,25 @@ function ProcessingModeMenuItem({ mode, label, onSelect }) {
       <Icon size={15} className="text-accent" />
       {label}
     </button>
+  );
+}
+
+function VideoIndexBadge({ state, rebuilding, onRebuild }) {
+  const labels = { missing: "索引缺失", stale: "索引已过期", failed: "索引不可用" };
+  if (!labels[state]) return null;
+  return (
+    <span className="inline-flex items-center gap-1">
+      <span className="inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-800 dark:border-amber-900/70 dark:bg-amber-950/40 dark:text-amber-300">
+        <AlertTriangle size={12} />
+        {labels[state]}
+      </span>
+      <button type="button" onClick={(event) => { event.stopPropagation(); onRebuild(); }}
+        disabled={rebuilding} title={rebuilding ? "正在重建检索索引" : "重建检索索引"}
+        aria-label="重建检索索引"
+        className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-amber-700 transition-colors hover:bg-amber-100 disabled:cursor-wait disabled:opacity-50 dark:text-amber-300 dark:hover:bg-amber-950/50">
+        <RefreshCw size={13} className={rebuilding ? "animate-spin" : ""} />
+      </button>
+    </span>
   );
 }
 
@@ -644,6 +664,7 @@ function PanelFooter({
 export function WorkspaceLibraryPanel({
   allowSourceRegeneration = true,
   activeSeries,
+  indexSnapshot = null,
   selectedContextType,
   selectedVideo,
   isGeneratingSelectedVideo,
@@ -679,6 +700,19 @@ export function WorkspaceLibraryPanel({
   onChangeProcessingMode,
 }) {
  const {api}=useWorkspaceRuntime();
+  const [indexRebuildPending, setIndexRebuildPending] = useState(false);
+  const [indexRebuildError, setIndexRebuildError] = useState(null);
+  useEffect(() => { setIndexRebuildPending(false); }, [indexSnapshot]);
+  const rebuildIndex = async () => {
+    setIndexRebuildPending(true);
+    setIndexRebuildError(null);
+    try {
+      await api.fetchJson("/api/workspace/index/refresh", { method: "POST" });
+    } catch (error) {
+      setIndexRebuildPending(false);
+      setIndexRebuildError(error instanceof Error ? error.message : "提交重建任务失败");
+    }
+  };
   const videos = activeSeries?.videos ?? [];
   const isPlayground = isPlaygroundSeries(activeSeries);
   const isBilibiliInbox = isBilibiliInboxSeries(activeSeries);
@@ -880,6 +914,7 @@ export function WorkspaceLibraryPanel({
 
       {/* Video / Source List */}
       <div className="relative flex-1 overflow-y-auto" aria-label="视频列表">
+        {indexRebuildError ? <p role="alert" className="px-4 pt-3 text-xs text-red-700 dark:text-red-300">{indexRebuildError}</p> : null}
         <div className={`p-4 flex flex-col gap-3 ${selectedCount > 0 ? "pb-20" : ""}`}>
           {!isPlayground ? (
             <button
@@ -943,7 +978,14 @@ export function WorkspaceLibraryPanel({
                   />
                 )}
                 <div className="flex justify-between items-start w-full gap-2">
-                  <VideoBadge video={video} />
+                  <div className="flex min-w-0 flex-wrap gap-1.5">
+                    <VideoBadge video={video} />
+                    <VideoIndexBadge
+                      state={indexSnapshot?.seriesId === activeSeries?.id ? indexSnapshot.videoStates?.[video.id] : null}
+                      rebuilding={indexRebuildPending || indexSnapshot?.status === "running"}
+                      onRebuild={rebuildIndex}
+                    />
+                  </div>
                   <div className="flex items-center gap-2">
                     {!isPlayground ? (
                       <button

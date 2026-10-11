@@ -21,6 +21,8 @@ from typing import Any
 from llama_index.core.embeddings import BaseEmbedding
 from pydantic import PrivateAttr
 
+from backend.core.errors import UserVisibleError
+
 
 _DLL_DIRECTORY_HANDLES: list[object] = []
 _PRELOADED_CUDA_DLLS: list[object] = []
@@ -118,6 +120,11 @@ def build_fastembed_embedding(
 def _create_text_embedding(*, model_name: str, device: str, cache_dir: str | None):
     """创建底层 `fastembed.TextEmbedding`，并按设备补充 provider 与 CUDA 运行时准备。"""
     if device == "gpu":
+        import onnxruntime
+        if "CUDAExecutionProvider" not in onnxruntime.get_available_providers():
+            raise UserVisibleError("rag_cuda_unavailable",
+                "检索模型配置为 GPU，但当前 Python 的 ONNX Runtime 不支持 CUDA。"
+                "请使用 GPU 运行环境，或在设置中将检索设备改为 CPU。")
         _prepare_cuda_runtime()
     text_embedding_cls = _load_text_embedding_cls()
     kwargs: dict[str, object] = {"model_name": model_name}
@@ -166,7 +173,8 @@ def _require_cuda_provider(embedding) -> None:
     """校验 FastEmbed 实际加载的 ONNX Runtime providers；缺失 CUDA 时直接抛错。"""
     providers = _resolve_active_providers(embedding)
     if "CUDAExecutionProvider" not in providers:
-        raise RuntimeError(
+        raise UserVisibleError(
+            "rag_cuda_unavailable",
             "FastEmbed GPU 初始化失败：CUDAExecutionProvider 未激活。"
             f"当前 ONNX Runtime providers: {providers or ['unknown']}。"
         )

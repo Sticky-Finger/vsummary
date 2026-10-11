@@ -149,6 +149,13 @@ class LazyAgentRuntimeProvider:
             if self._cached_retrieval_service is not None:
                 self._cached_retrieval_service.invalidate()
 
+    def inspect_workspace_indexes(self, plan, series_id: str | None = None):
+        from backend.video_summary.infrastructure.rag.agent_memory.index_health import inspect_index_health
+        settings = load_settings(self._root_dir / "config" / "settings.toml", self._root_dir).agent_retrieval
+        return inspect_index_health(workspace=self._workspace, plan=plan, series_id=series_id,
+            embedding_profile={"provider": settings.embedding_provider, "model": settings.embedding_model,
+                "endpoint": settings.embedding_endpoint, "dimensions": settings.embedding_dimensions})
+
     def refresh_workspace_indexes(self, target_dir: Path | None = None, *, source_dir: Path | None = None,
         changes=(), progress=None, check_cancelled=None) -> None:
         service = self._get_or_create_retrieval_service() if target_dir is None else self._build_series_retrieval_service(target_dir)

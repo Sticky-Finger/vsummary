@@ -13,7 +13,6 @@ from backend.core.errors import ActiveJobConflictError
 from backend.video_summary.library.ports import (
     GenerationActivityChecker,
     VideoMutationStore,
-    WorkspaceIndexRefresher,
 )
 
 
@@ -107,19 +106,16 @@ class DeleteSeries:
     def __init__(
         self,
         workspace: VideoMutationStore,
-        index_refresher: WorkspaceIndexRefresher,
         generation_activity_checker: GenerationActivityChecker | None = None,
     ) -> None:
-        """注入变更端口、索引刷新器与可选的生成活动查询器。
+        """注入变更端口与可选的生成活动查询器。
 
         Args:
             workspace: 真正执行"删除系列 + 清制品"的下游端口。
-            index_refresher: 用于从 RAG 索引中删除整个系列。
             generation_activity_checker: 用于在删除前判定是否有生成任务在跑；
                 为 `None` 时跳过该前置校验（适用于测试或离线批处理场景）。
         """
         self._workspace = workspace
-        self._index_refresher = index_refresher
         self._generation_activity_checker = generation_activity_checker
 
     def run(self, series_id: str) -> DeleteSeriesResult:
@@ -146,7 +142,6 @@ class DeleteSeries:
             raise GenerationInProgressError(str(error)) from error
         if not deleted:
             raise LookupError(f"series not found '{series_id}'")
-        self._index_refresher.delete_series(series_id)
         return DeleteSeriesResult(series_id=series_id)
 
 
@@ -160,19 +155,16 @@ class DeleteVideoSource:
     def __init__(
         self,
         workspace: VideoMutationStore,
-        index_refresher: WorkspaceIndexRefresher,
         generation_activity_checker: GenerationActivityChecker | None = None,
     ) -> None:
-        """注入变更端口、索引刷新器与可选的生成活动查询器。
+        """注入变更端口与可选的生成活动查询器。
 
         Args:
             workspace: 真正执行"删除视频 + 清制品"的下游端口。
-            index_refresher: 用于从 RAG 索引中删除单视频。
             generation_activity_checker: 用于在删除前判定是否有生成任务在跑；
                 为 `None` 时跳过该前置校验。
         """
         self._workspace = workspace
-        self._index_refresher = index_refresher
         self._generation_activity_checker = generation_activity_checker
 
     def run(self, series_id: str, video_id: str) -> DeleteVideoResult:
@@ -203,5 +195,4 @@ class DeleteVideoSource:
             raise GenerationInProgressError(str(error)) from error
         if not deleted:
             raise LookupError(f"video not found '{series_id}/{video_id}'")
-        self._index_refresher.delete_video(series_id, video_id)
         return DeleteVideoResult(series_id=series_id, video_id=video_id)

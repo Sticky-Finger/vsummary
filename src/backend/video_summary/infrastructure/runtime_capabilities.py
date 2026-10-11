@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from importlib.util import find_spec
 import platform
 import subprocess
 
@@ -30,7 +31,13 @@ def detect_runtime_capabilities() -> RuntimeCapabilities:
     nvidia_cuda_available = _is_nvidia_cuda_available()
     accelerator = _detect_accelerator(system_name, nvidia_cuda_available)
     local_cuda_available = nvidia_cuda_available and system_name != "darwin"
+    gpu_embedding_available = False
+    if local_cuda_available and find_spec("onnxruntime") is not None:
+        import onnxruntime
+        gpu_embedding_available = "CUDAExecutionProvider" in onnxruntime.get_available_providers()
     unavailable_reason = None if local_cuda_available else _build_unavailable_reason(system_name, accelerator)
+    if local_cuda_available and not gpu_embedding_available:
+        unavailable_reason = "检测到 NVIDIA 显卡，但当前 Python 的 ONNX Runtime 不支持 CUDA；检索模型请使用 CPU 或安装 GPU 运行环境。"
     return RuntimeCapabilities(
         platform=system_name,
         accelerator=accelerator,
@@ -38,7 +45,7 @@ def detect_runtime_capabilities() -> RuntimeCapabilities:
         # faster-whisper supports CPU execution. CUDA controls acceleration, not
         # whether the Local CPU product may select the ASR provider at all.
         faster_whisper_available=True,
-        gpu_embedding_available=local_cuda_available,
+        gpu_embedding_available=gpu_embedding_available,
         unavailable_reason=unavailable_reason,
     )
 

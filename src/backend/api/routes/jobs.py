@@ -8,7 +8,7 @@ import json
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 
-from backend.api.dependencies import JobRepositoryDep, get_workspace_context
+from backend.api.dependencies import JobRepositoryDep, WorkspaceServicesDep, get_workspace_context
 from backend.core.context import WorkspaceContext
 from backend.core.jobs import job_snapshot_payload
 
@@ -17,10 +17,23 @@ router = APIRouter()
 
 
 @router.get("/api/workspace/index/status")
-def workspace_index_status(job_repository: JobRepositoryDep, context: WorkspaceContext = Depends(get_workspace_context)):
+def workspace_index_status(job_repository: JobRepositoryDep, services: WorkspaceServicesDep,
+    context: WorkspaceContext = Depends(get_workspace_context), series_id: str | None = None):
     from backend.api.adapters.job_status import durable_status
-    return durable_status(job_repository, workspace_id=context.workspace_id,
+    status = durable_status(job_repository, workspace_id=context.workspace_id,
         resource_id=context.workspace_id, operations=("refresh_rag_index",))
+    try:
+        health = services.inspect_agent_workspace_indexes(
+            job_repository.index_refresh_plan(context.workspace_id), series_id=series_id)
+    except LookupError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    return {**status, **health}
+
+
+@router.post("/api/workspace/index/refresh", status_code=202)
+def refresh_workspace_index(job_repository: JobRepositoryDep, context: WorkspaceContext = Depends(get_workspace_context)):
+    job_repository.request_index_refresh(context.workspace_id)
+    return {"status": "queued"}
 
 _TERMINAL_STATUSES = {"succeeded", "failed", "cancelled"}
 
